@@ -1,46 +1,42 @@
 import joblib
 import pandas as pd
+import numpy as np
 import os
+import logging
+from feature_engineering import build_features
+
+logger = logging.getLogger(__name__)
 
 # Relative path up one directory where we serialized the model
 MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ML-Model", "tuned_aqi_model.pkl")
 
-# Cached memory state
-_model = None
+# Load model ONCE at startup
+print("Initializing Machine Learning Service...")
+try:
+    if os.path.exists(MODEL_PATH):
+        aqi_model = joblib.load(MODEL_PATH)
+        print(f"Model loaded securely from {MODEL_PATH}")
+    else:
+        aqi_model = None
+        print(f"Warning: Model not found at {MODEL_PATH}")
+except Exception as e:
+    print(f"Error loading model mapping: {e}")
+    aqi_model = None
 
-def load_model():
-    global _model
-    if _model is None:
-        try:
-            if os.path.exists(MODEL_PATH):
-                _model = joblib.load(MODEL_PATH)
-                print(f"Model loaded securely from {MODEL_PATH}")
-            else:
-                _model = None
-                print(f"Warning: Model not found at {MODEL_PATH}")
-        except Exception as e:
-            print(f"Error loading model mapping: {e}")
-            _model = None
-    return _model
-
-def make_prediction(features: dict) -> float:
-    """Takes a dictionary mapping to the API predict endpoint payload."""
-    model = load_model()
+def make_prediction(request_data: dict, db, current_time) -> float:
+    """Takes base inputs, runs them through the stateful feature engine, and predicts."""
+    if aqi_model is None:
+        raise ValueError("Machine learning model is currently unavailable.")
     
-    if not model:
-        # Fallback dummy logic if Model is missing to keep Backend endpoints answering
-        return (features.get('co', 0) + features.get('nox', 0) + features.get('no2', 0)) * 0.1
-    
-    # We map the JSON inference directly into a Pandas frame. 
-    # NOTE: Since our notebook advanced generation expanded ~13 columns into ~40 columns via Lags,
-    # and the frontend limits to 5 parameters, an immediate dimensionality mismatch occurs.
-    # For this architecture scaffold, we trap the mismatch and issue a safe fallback.
-    df = pd.DataFrame([features])
+    # Check if model has predefined feature names to handle pandas conversion properly
+    feature_names = getattr(aqi_model, 'feature_names_in_', None)
     
     try:
-        prediction = model.predict(df)[0]
+        # Build 212-feature matrix based on latest historical windows
+        df = build_features(db, current_time, request_data, list(feature_names) if feature_names is not None else [])
+        
+        prediction = aqi_model.predict(df)[0]
         return float(prediction)
-    except ValueError as e:
-        print(f"Dimensionality Mismatch (API signature != ML Model signature): {e}")
-        # Safe dummy prediction return
-        return 102.5
+    except Exception as e:
+        logger.error(f"Prediction Pipeline Error: {e}")
+        raise ValueError(f"Processing failed: {e}")

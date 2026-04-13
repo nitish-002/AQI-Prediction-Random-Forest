@@ -2,9 +2,14 @@
 
 You can import these directly into Postman by going to `File > Import > Raw text` and pasting the cURL command, or by running them directly in your terminal.
 
-## 1. Health Check (Root)
+## 1. Root
 ```bash
 curl --location 'http://127.0.0.1:8000/'
+```
+
+## 1.1 API and Model Health Check
+```bash
+curl --location 'http://127.0.0.1:8000/health'
 ```
 
 ## 2. Upload CSV Dataset
@@ -30,6 +35,7 @@ curl --location 'http://127.0.0.1:8000/model-metrics'
 ```
 
 ## 6. Predict Single AQI
+*Note: The features array must contain the exact number of correctly scaled/ordered features your model requires.*
 ```bash
 curl --location 'http://127.0.0.1:8000/predict' \
 --header 'Content-Type: application/json' \
@@ -39,7 +45,7 @@ curl --location 'http://127.0.0.1:8000/predict' \
     "no2": 85.0,
     "temperature": 25.5,
     "humidity": 45.0,
-    "timestamp": "2026-04-10T12:00:00"
+    "abs_humidity": 0.8
 }'
 ```
 
@@ -55,7 +61,7 @@ curl --location 'http://127.0.0.1:8000/batch-predict' \
             "no2": 85.0,
             "temperature": 25.5,
             "humidity": 45.0,
-            "timestamp": "2026-04-10T12:00:00"
+            "abs_humidity": 0.8
         },
         {
             "co": 3.1,
@@ -63,7 +69,7 @@ curl --location 'http://127.0.0.1:8000/batch-predict' \
             "no2": 90.0,
             "temperature": 26.0,
             "humidity": 50.0,
-            "timestamp": "2026-04-10T13:00:00"
+            "abs_humidity": 0.95
         }
     ]
 }'

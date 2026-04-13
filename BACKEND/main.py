@@ -29,6 +29,14 @@ app.include_router(router)
 def read_root():
     return {"message": "AQI Backend Service is securely running."}
 
+@app.get("/health")
+def health_check():
+    from ml_service import aqi_model
+    return {
+        "status": "healthy",
+        "model_loaded": aqi_model is not None
+    }
+
 if __name__ == "__main__":
     import uvicorn
     # This block allows you to start the server simply by running `python main.py`

@@ -14,6 +14,7 @@ class SensorData(Base):
     no2 = Column(Float)
     temperature = Column(Float)
     humidity = Column(Float)
+    abs_humidity = Column(Float, nullable=True)
 
 class PredictionRecord(Base):
     __tablename__ = "predictions"
@@ -29,10 +30,11 @@ class PredictRequest(BaseModel):
     no2: float
     temperature: float
     humidity: float
-    timestamp: datetime.datetime
+    abs_humidity: Optional[float] = 0.0
 
 class PredictResponse(BaseModel):
     predicted_aqi: float
+    raw_co_prediction: float
     confidence: float
     timestamp: datetime.datetime
 
