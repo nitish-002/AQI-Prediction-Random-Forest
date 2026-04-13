@@ -1,0 +1,62 @@
+# Environments
+.env
+.venv/
+venv/
+env/
+ENV/
+*.virtualenv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Models
+# If you want to track small models like tuned_aqi_model.pkl, you can uncomment the line below:
+# !ML-Model/tuned_aqi_model.pkl
+*.pkl
+*.model
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing / profiling
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
