@@ -111,8 +111,14 @@ def execute_training_pipeline(file_path: str):
         df.dropna(inplace=True)
         # ---------------------------------------
 
-        # Exclude metadata arrays that random forest shouldn't touch or target
-        ignore_cols = ['Date', 'Time', 'Unnamed: 15', 'Unnamed: 16']
+        # Exclude metadata arrays and chemical sensors that the UI does NOT supply,
+        # otherwise we end up padding missing features with 0.0 during prediction!
+        ignore_cols = [
+            'Date', 'Time', 'Unnamed: 15', 'Unnamed: 16',
+            'PT08.S1(CO)', 'C6H6(GT)', 'PT08.S2(NMHC)', 'PT08.S3(NOx)', 
+            'PT08.S4(NO2)', 'PT08.S5(O3)', 'NMHC(GT)'
+        ]
+        
         for col in ignore_cols:
             if col in df.columns:
                 df.drop(columns=[col], inplace=True)

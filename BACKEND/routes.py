@@ -60,7 +60,14 @@ async def predict_aqi(request: models.PredictRequest, db: Session = Depends(get_
         no2=request.no2,
         temperature=request.temperature,
         humidity=request.humidity,
-        abs_humidity=request.abs_humidity
+        abs_humidity=request.abs_humidity,
+        pt08_s1_co=request.pt08_s1_co,
+        c6h6_gt=request.c6h6_gt,
+        pt08_s2_nmhc=request.pt08_s2_nmhc,
+        pt08_s3_nox=request.pt08_s3_nox,
+        pt08_s4_no2=request.pt08_s4_no2,
+        pt08_s5_o3=request.pt08_s5_o3,
+        nmhc_gt=request.nmhc_gt
     )
     db.add(db_record)
     db.commit()

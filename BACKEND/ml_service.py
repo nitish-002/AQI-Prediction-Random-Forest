@@ -7,24 +7,36 @@ from feature_engineering import build_features
 
 logger = logging.getLogger(__name__)
 
-# Relative path up one directory where we serialized the model
-MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ML-Model", "tuned_aqi_model.pkl")
+# Paths
+BASE_MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ML-Model", "tuned_aqi_model.pkl")
+RETRAINED_MODEL_PATH = os.path.join(os.path.dirname(__file__), "data", "latest_retrained_model.pkl")
 
-# Load model ONCE at startup
-print("Initializing Machine Learning Service...")
-try:
-    if os.path.exists(MODEL_PATH):
-        aqi_model = joblib.load(MODEL_PATH)
-        print(f"Model loaded securely from {MODEL_PATH}")
+aqi_model = None
+last_loaded_time = 0
+
+def load_latest_model():
+    global aqi_model, last_loaded_time
+    
+    # Prefer retrained model if available
+    target_path = RETRAINED_MODEL_PATH if os.path.exists(RETRAINED_MODEL_PATH) else BASE_MODEL_PATH
+    
+    if os.path.exists(target_path):
+        mtime = os.path.getmtime(target_path)
+        if mtime > last_loaded_time:
+            print(f"Loading/Reloading Model from {target_path}")
+            aqi_model = joblib.load(target_path)
+            last_loaded_time = mtime
+            print("Model successfully loaded into memory.")
     else:
-        aqi_model = None
-        print(f"Warning: Model not found at {MODEL_PATH}")
-except Exception as e:
-    print(f"Error loading model mapping: {e}")
-    aqi_model = None
+        if aqi_model is None:
+            print(f"Warning: No valid model found at {target_path}")
+
+# Initial load
+load_latest_model()
 
 def make_prediction(request_data: dict, db, current_time) -> float:
     """Takes base inputs, runs them through the stateful feature engine, and predicts."""
+    load_latest_model()
     if aqi_model is None:
         raise ValueError("Machine learning model is currently unavailable.")
     

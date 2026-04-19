@@ -1,16 +1,27 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
 
-# We will use SQLite for local development as requested
-# Once ready for PostgreSQL, substitute this string with:
-# SQLALCHEMY_DATABASE_URL = "postgresql://user:password@postgresserver/db"
-SQLALCHEMY_DATABASE_URL = "sqlite:///./aqi_prediction.db"
+# Load environment variables from .env file
+load_dotenv()
 
-# connect_args={"check_same_thread": False} is required only for SQLite
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+# Fetch DATABASE_URL from .env, or use a default if it's not set
+SQLALCHEMY_DATABASE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://postgres:password@localhost:5432/aqi_prediction"
 )
+
+# SQLite uses format "postgresql://", we no longer need the sqlite connect_args
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+else:
+    # Fallback to SQLite check if needed
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

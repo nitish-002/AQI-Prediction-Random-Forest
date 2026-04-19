@@ -1,3 +1,4 @@
+# Data Science & ML Model
 pandas
 numpy
 matplotlib
@@ -6,3 +7,14 @@ scikit-learn
 jupyter
 ipykernel
 xgboost
+
+# FastAPI Backend & Server
+fastapi
+uvicorn
+pydantic
+python-multipart
+
+# Database & Migration
+SQLAlchemy
+python-dotenv
+psycopg2-binary
