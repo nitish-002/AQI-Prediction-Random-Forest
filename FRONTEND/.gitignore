@@ -38,6 +38,9 @@ coverage/
 # Wrangler / Cloudflare
 .wrangler/
 
+# Netlify
+.netlify/
+
 # IDE & OS
 .vscode/*
 !.vscode/extensions.json
