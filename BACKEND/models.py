@@ -31,6 +31,16 @@ class PredictionRecord(Base):
     predicted_aqi = Column(Float)
     confidence = Column(Float)
 
+class ForecastRecord(Base):
+    """Stores each individual future forecast point."""
+    __tablename__ = "forecasts"
+    id = Column(Integer, primary_key=True, index=True)
+    request_timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    hours_ahead = Column(Integer)                # e.g. 1, 3, 6, 12
+    predicted_timestamp = Column(String)         # ISO8601 string of the future point
+    predicted_co = Column(Float)
+    predicted_aqi = Column(Integer)
+
 # --- Pydantic Schemas (API Translation layer APIContracts.md) ---
 class PredictRequest(BaseModel):
     co: float
@@ -66,3 +76,17 @@ class ModelMetricsResponse(BaseModel):
     rmse: float
     mae: float
     r2_score: float
+
+# --- Forecast Schemas ---
+class ForecastPoint(BaseModel):
+    """A single predicted future data point."""
+    hours_ahead: int
+    predicted_timestamp: str
+    predicted_co: float
+    predicted_aqi: int
+
+class ForecastResponse(BaseModel):
+    """The full multi-horizon forecast response."""
+    current_timestamp: str
+    forecasts: List[ForecastPoint]
+

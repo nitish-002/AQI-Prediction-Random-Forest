@@ -1,13 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
-import { Loader2, UploadCloud, FileSpreadsheet, Dices } from "lucide-react";
+import { Loader2, UploadCloud, FileSpreadsheet, Dices, TrendingUp, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { predict, uploadCsv, type PredictInput, type PredictionResult } from "@/lib/api";
+import {
+  predict, forecast, uploadCsv,
+  type PredictInput, type PredictionResult, type ForecastResponse,
+  getAqiCategory,
+} from "@/lib/api";
 import { AqiBadge } from "@/components/AqiBadge";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
 
 export const Route = createFileRoute("/_authenticated/predict")({
   head: () => ({ meta: [{ title: "Predict AQI — AQI Prediction System" }] }),
@@ -62,9 +69,11 @@ function PredictPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof PredictInput, string>>>({});
   const [loading, setLoading] = useState(false);
+  const [forecastLoading, setForecastLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [uploadInfo, setUploadInfo] = useState<string | null>(null);
   const [inlineResult, setInlineResult] = useState<PredictionResult | null>(null);
+  const [forecastResult, setForecastResult] = useState<ForecastResponse | null>(null);
 
   const setField = (k: keyof PredictInput, v: string) => {
     setValues((s) => ({ ...s, [k]: v }));
@@ -112,6 +121,22 @@ function PredictPage() {
       setErrors({ co: "API Error: " + (err.message || 'Failed') });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForecast = async () => {
+    const input = validate();
+    if (!input) return;
+    setForecastLoading(true);
+    setForecastResult(null);
+    try {
+      const result = await forecast(input);
+      setForecastResult(result);
+    } catch (err: any) {
+      console.error(err);
+      setErrors({ co: "Forecast Error: " + (err.message || 'Failed') });
+    } finally {
+      setForecastLoading(false);
     }
   };
 
@@ -221,26 +246,46 @@ function PredictPage() {
               })}
             </div>
 
-            <Button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="mt-6 h-11 w-full rounded-lg bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Running prediction…
-                </>
-              ) : (
-                "Run Prediction"
-              )}
-            </Button>
+            <div className="mt-6 flex gap-3">
+              <Button
+                onClick={handleSubmit}
+                disabled={loading || forecastLoading}
+                className="h-11 flex-1 rounded-lg bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Running…
+                  </>
+                ) : (
+                  "Run Prediction"
+                )}
+              </Button>
+              <Button
+                onClick={handleForecast}
+                disabled={loading || forecastLoading}
+                variant="outline"
+                className="h-11 flex-1 gap-2 rounded-lg border-primary/40 text-primary hover:bg-primary/5"
+              >
+                {forecastLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Forecasting…
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="h-4 w-4" />
+                    Forecast Future
+                  </>
+                )}
+              </Button>
+            </div>
 
             {inlineResult && (
               <div className="mt-6 rounded-lg border border-border bg-muted/30 p-5 shadow-inner">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    Prediction Result
+                    Current AQI
                   </p>
                   <div className="flex items-center justify-center gap-4">
                     <span className="text-5xl font-bold tabular-nums tracking-tight">
@@ -254,6 +299,8 @@ function PredictPage() {
                 </div>
               </div>
             )}
+
+            {forecastResult && <ForecastPanel result={forecastResult} />}
           </CardContent>
         </Card>
 
@@ -310,6 +357,110 @@ function PredictPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── AQI colour helpers ───────────────────────────────────────────────────────
+function aqiColor(aqi: number): string {
+  if (aqi <= 50)  return "#22c55e";   // green
+  if (aqi <= 100) return "#facc15";   // yellow
+  if (aqi <= 150) return "#f97316";   // orange
+  if (aqi <= 200) return "#ef4444";   // red
+  if (aqi <= 300) return "#a855f7";   // purple
+  return "#7f1d1d";                    // maroon/hazardous
+}
+
+// ─── Forecast Panel ───────────────────────────────────────────────────────────
+function ForecastPanel({ result }: { result: ForecastResponse }) {
+  const chartData = result.forecasts.map((f) => ({
+    name: `+${f.hours_ahead}h`,
+    aqi: f.predicted_aqi,
+    fill: aqiColor(f.predicted_aqi),
+  }));
+
+  return (
+    <div className="mt-6 space-y-4 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/0 p-5 shadow-md">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+          <TrendingUp className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold">Future AQI Forecast</p>
+          <p className="text-[11px] text-muted-foreground">
+            Recursive multi-step prediction from{" "}
+            {new Date(result.current_timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+      </div>
+
+      {/* Horizon tiles */}
+      <div className="grid grid-cols-4 gap-2">
+        {result.forecasts.map((f) => {
+          const cat = getAqiCategory(f.predicted_aqi);
+          const color = aqiColor(f.predicted_aqi);
+          return (
+            <div
+              key={f.hours_ahead}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border/60 bg-background/60 py-3 text-center shadow-sm transition-shadow hover:shadow-md"
+              style={{ borderTopColor: color, borderTopWidth: 3 }}
+            >
+              <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                +{f.hours_ahead}hr
+              </div>
+              <span
+                className="text-2xl font-bold tabular-nums"
+                style={{ color }}
+              >
+                {f.predicted_aqi}
+              </span>
+              <span className="text-[10px] text-muted-foreground leading-tight px-1">
+                {cat}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mini bar chart */}
+      <div className="h-[120px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              domain={[0, "auto"]}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "var(--color-popover)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                fontSize: 12,
+                color: "var(--color-popover-foreground)",
+              }}
+              formatter={(val: number) => [`AQI ${val}`, ""]}
+            />
+            <Bar dataKey="aqi" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} opacity={0.85} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

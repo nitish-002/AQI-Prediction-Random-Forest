@@ -3,7 +3,9 @@ import pandas as pd
 import numpy as np
 import os
 import logging
-from feature_engineering import build_features
+import datetime
+from typing import List
+from feature_engineering import build_features, init_forecast_state, build_one_forecast_step
 
 logger = logging.getLogger(__name__)
 
@@ -52,3 +54,69 @@ def make_prediction(request_data: dict, db, current_time) -> float:
     except Exception as e:
         logger.error(f"Prediction Pipeline Error: {e}")
         raise ValueError(f"Processing failed: {e}")
+
+
+FORECAST_HORIZONS = [1, 3, 6, 12]  # hours ahead
+
+
+def make_forecast(request_data: dict, db, current_time: datetime.datetime) -> List[dict]:
+    """
+    Recursive multi-step future AQI forecast.
+
+    For each horizon in FORECAST_HORIZONS, the function:
+      1. Builds the feature row for that future timestamp using the evolving
+         rolling history buffers (init_forecast_state / build_one_forecast_step).
+      2. Predicts CO(GT) with the trained Random Forest.
+      3. Injects the predicted CO back into the history buffer so that the
+         NEXT step's lag features reflect this prediction (recursive strategy).
+
+    Returns a list of dicts, one per horizon:
+      { hours_ahead, predicted_timestamp, predicted_co, predicted_aqi }
+    """
+    from aqi_calculator import calculate_co_aqi
+
+    load_latest_model()
+    if aqi_model is None:
+        raise ValueError("Machine learning model is currently unavailable.")
+
+    feature_names = list(getattr(aqi_model, 'feature_names_in_', []))
+
+    try:
+        # Initialise rolling history buffers from DB + current reading (called once)
+        state = init_forecast_state(db, current_time, request_data)
+
+        results = []
+        max_horizon = max(FORECAST_HORIZONS)
+
+        # Step through every hour up to max_horizon, but only RECORD the ones in FORECAST_HORIZONS
+        for step in range(1, max_horizon + 1):
+            future_ts = current_time + datetime.timedelta(hours=step)
+
+            # Build the feature row for this step
+            step_df = build_one_forecast_step(state, future_ts, feature_names)
+
+            # Predict
+            predicted_co = float(aqi_model.predict(step_df)[0])
+            predicted_co = max(0.0, predicted_co)  # cap negatives
+
+            # --- Recursive injection: push predicted CO into the history buffer ---
+            state['co_history'].append(predicted_co)
+            # Keep buffer length reasonable (no need to grow unbounded)
+            if len(state['co_history']) > 30:
+                state['co_history'].pop(0)
+
+            # Record only the desired horizons
+            if step in FORECAST_HORIZONS:
+                results.append({
+                    "hours_ahead": step,
+                    "predicted_timestamp": future_ts.isoformat() + "Z",
+                    "predicted_co": round(predicted_co, 4),
+                    "predicted_aqi": calculate_co_aqi(predicted_co),
+                })
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Forecast Pipeline Error: {e}")
+        raise ValueError(f"Forecast processing failed: {e}")
+

@@ -317,3 +317,64 @@ export async function uploadCsv(file: File): Promise<{ rows: number; jobId: stri
 
   return { rows: Math.max(1, Math.round(file.size / 80)), jobId: `job_${Date.now()}` };
 }
+
+// ---------- forecasting ----------
+export interface ForecastPoint {
+  hours_ahead: number;
+  predicted_timestamp: string;
+  predicted_co: number;
+  predicted_aqi: number;
+}
+
+export interface ForecastResponse {
+  current_timestamp: string;
+  forecasts: ForecastPoint[];
+}
+
+export async function forecast(input: PredictInput): Promise<ForecastResponse> {
+  const reqBody = {
+    co: input.co,
+    nox: input.nox,
+    no2: input.no2,
+    temperature: input.temperature,
+    humidity: input.humidity,
+    abs_humidity: input.abs_humidity ?? 0.0,
+    pt08_s1_co: input.pt08_s1_co,
+    c6h6_gt: input.c6h6_gt,
+    pt08_s2_nmhc: input.pt08_s2_nmhc,
+    pt08_s3_nox: input.pt08_s3_nox,
+    pt08_s4_no2: input.pt08_s4_no2,
+    pt08_s5_o3: input.pt08_s5_o3,
+    nmhc_gt: input.nmhc_gt,
+  };
+
+  const res = await fetch(`${API_BASE_URL}/forecast`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reqBody),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(err.detail || "Forecast failed");
+  }
+
+  return res.json() as Promise<ForecastResponse>;
+}
+
+export interface ForecastHistoryEntry {
+  requested_at: string;
+  forecasts: ForecastPoint[];
+}
+
+export async function getForecastHistory(limit = 5): Promise<ForecastHistoryEntry[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/forecast-history?limit=${limit}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.history ?? []) as ForecastHistoryEntry[];
+  } catch {
+    return [];
+  }
+}
+

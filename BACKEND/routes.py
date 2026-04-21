@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 import models
-from ml_service import make_prediction
+from ml_service import make_prediction, make_forecast
 import datetime
 
 router = APIRouter()
@@ -99,6 +99,92 @@ async def predict_aqi(request: models.PredictRequest, db: Session = Depends(get_
         "timestamp": current_time
     }
 
+@router.post("/forecast", response_model=models.ForecastResponse)
+async def forecast_aqi(request: models.PredictRequest, db: Session = Depends(get_db)):
+    """
+    Returns future AQI predictions at +1hr, +3hr, +6hr, and +12hr horizons.
+
+    The current sensor reading is stored to the database first (building up
+    historical context), and then a recursive multi-step forecast is run using
+    the existing trained Random Forest model.
+    """
+    current_time = datetime.datetime.utcnow()
+
+    # 1. Persist current reading so it contributes to the history window
+    db_record = models.SensorData(
+        timestamp=current_time,
+        co=request.co,
+        nox=request.nox,
+        no2=request.no2,
+        temperature=request.temperature,
+        humidity=request.humidity,
+        abs_humidity=request.abs_humidity,
+        pt08_s1_co=request.pt08_s1_co,
+        c6h6_gt=request.c6h6_gt,
+        pt08_s2_nmhc=request.pt08_s2_nmhc,
+        pt08_s3_nox=request.pt08_s3_nox,
+        pt08_s4_no2=request.pt08_s4_no2,
+        pt08_s5_o3=request.pt08_s5_o3,
+        nmhc_gt=request.nmhc_gt,
+    )
+    db.add(db_record)
+    db.commit()
+
+    try:
+        # 2. Run recursive multi-step forecast
+        forecast_points = make_forecast(request.model_dump(), db, current_time)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # 3. Persist each forecast point
+    for point in forecast_points:
+        db.add(models.ForecastRecord(
+            request_timestamp=current_time,
+            hours_ahead=point["hours_ahead"],
+            predicted_timestamp=point["predicted_timestamp"],
+            predicted_co=point["predicted_co"],
+            predicted_aqi=point["predicted_aqi"],
+        ))
+    db.commit()
+
+    return {
+        "current_timestamp": current_time.isoformat() + "Z",
+        "forecasts": forecast_points,
+    }
+
+@router.get("/forecast-history")
+async def forecast_history(limit: int = 20, db: Session = Depends(get_db)):
+    """
+    Returns the most recent N forecast requests with all their horizon points.
+    Useful for the frontend to display a history of past forecast runs.
+    """
+    records = (
+        db.query(models.ForecastRecord)
+        .order_by(models.ForecastRecord.request_timestamp.desc())
+        .limit(limit * 4)   # 4 horizon points per request
+        .all()
+    )
+
+    # Group by request_timestamp
+    from collections import defaultdict
+    grouped: dict = defaultdict(list)
+    for r in records:
+        grouped[r.request_timestamp.isoformat() + "Z"].append({
+            "hours_ahead": r.hours_ahead,
+            "predicted_timestamp": r.predicted_timestamp,
+            "predicted_co": r.predicted_co,
+            "predicted_aqi": r.predicted_aqi,
+        })
+
+    history = [
+        {"requested_at": ts, "forecasts": points}
+        for ts, points in sorted(grouped.items(), reverse=True)
+    ][:limit]
+
+    return {"history": history}
+
 @router.post("/batch-predict")
 async def batch_predict(request: models.BatchPredictRequest, db: Session = Depends(get_db)):
     from aqi_calculator import calculate_co_aqi
@@ -160,3 +246,4 @@ async def aqi_filter(pollutant: str, start_date: str = None, end_date: str = Non
 @router.get("/export-predictions")
 async def export_predictions():
     return {"message": "CSV File payload export stub"}
+

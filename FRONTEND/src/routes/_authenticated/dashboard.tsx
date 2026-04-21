@@ -9,8 +9,11 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  BarChart,
+  Bar,
+  Cell,
 } from "recharts";
-import { Upload, Wind, TrendingUp, Activity, Gauge } from "lucide-react";
+import { Upload, Wind, TrendingUp, Activity, Gauge, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AqiBadge } from "@/components/AqiBadge";
@@ -21,7 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getTrends, type TrendPoint } from "@/lib/api";
+import {
+  getTrends,
+  getForecastHistory,
+  getAqiCategory,
+  type TrendPoint,
+  type ForecastPoint,
+} from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -30,12 +39,21 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
+function aqiColor(aqi: number): string {
+  if (aqi <= 50)  return "#22c55e";
+  if (aqi <= 100) return "#facc15";
+  if (aqi <= 150) return "#f97316";
+  if (aqi <= 200) return "#ef4444";
+  if (aqi <= 300) return "#a855f7";
+  return "#7f1d1d";
+}
+
 function DashboardPage() {
   const [range, setRange] = useState<"24h" | "7d" | "30d">("7d");
   const [data, setData] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Dynamic Metrics states
+  const [forecasts, setForecasts] = useState<ForecastPoint[]>([]);
+  const [forecastTime, setForecastTime] = useState<string | null>(null);
   const [todayAqi, setTodayAqi] = useState<number>(0);
   const [predictedAqi, setPredictedAqi] = useState<number>(0);
 
@@ -43,20 +61,37 @@ function DashboardPage() {
     setLoading(true);
     getTrends(range).then((d) => {
       setData(d);
-      
-      // Extract latest actual & predicted for top cards
       if (d.length > 0) {
-        const latestInfo = d[d.length - 1];
-        setTodayAqi(latestInfo.actual ?? 0);
-        setPredictedAqi(latestInfo.predicted ?? 0);
+        const latest = d[d.length - 1];
+        setTodayAqi(latest.actual ?? 0);
+        setPredictedAqi(latest.predicted ?? 0);
       }
-      
       setLoading(false);
     });
   }, [range]);
 
+  useEffect(() => {
+    getForecastHistory(1).then((history) => {
+      if (history.length > 0) {
+        const latest = history[0];
+        const sorted = [...latest.forecasts].sort(
+          (a, b) => a.hours_ahead - b.hours_ahead,
+        );
+        setForecasts(sorted);
+        setForecastTime(latest.requested_at);
+      }
+    });
+  }, []);
+
+  const forecastChartData = forecasts.map((f) => ({
+    name: `+${f.hours_ahead}h`,
+    aqi: f.predicted_aqi,
+    fill: aqiColor(f.predicted_aqi),
+  }));
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
@@ -106,7 +141,118 @@ function DashboardPage() {
         </Card>
       </div>
 
-      {/* Trend chart */}
+      {/* Future Forecast Panel — shown only when a forecast is available */}
+      {forecasts.length > 0 && (
+        <Card className="shadow-sm border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+                <TrendingUp className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Future AQI Forecast</CardTitle>
+                {forecastTime && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Based on reading at{" "}
+                    {new Date(forecastTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="gap-1.5 text-xs h-8"
+            >
+              <Link to="/predict">
+                <TrendingUp className="h-3.5 w-3.5" />
+                Run New Forecast
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Horizon tiles */}
+              <div className="grid grid-cols-4 gap-2">
+                {forecasts.map((f) => {
+                  const cat = getAqiCategory(f.predicted_aqi);
+                  const color = aqiColor(f.predicted_aqi);
+                  return (
+                    <div
+                      key={f.hours_ahead}
+                      className="flex flex-col items-center justify-center gap-1 rounded-lg border bg-background/70 py-3 text-center shadow-sm"
+                      style={{ borderTopColor: color, borderTopWidth: 3 }}
+                    >
+                      <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        +{f.hours_ahead}hr
+                      </div>
+                      <span
+                        className="text-2xl font-bold tabular-nums"
+                        style={{ color }}
+                      >
+                        {f.predicted_aqi}
+                      </span>
+                      <span className="px-1 text-[9px] leading-tight text-muted-foreground">
+                        {cat}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Mini forecast bar chart */}
+              <div className="h-[130px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={forecastChartData}
+                    margin={{ top: 4, right: 4, bottom: 0, left: -28 }}
+                  >
+                    <XAxis
+                      dataKey="name"
+                      tick={{
+                        fill: "var(--color-muted-foreground)",
+                        fontSize: 11,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: "var(--color-muted-foreground)",
+                        fontSize: 11,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--color-popover)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        color: "var(--color-popover-foreground)",
+                      }}
+                      formatter={(val: number) => [`AQI ${val}`, ""]}
+                    />
+                    <Bar dataKey="aqi" radius={[4, 4, 0, 0]}>
+                      {forecastChartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} opacity={0.85} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Historical trend chart */}
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <div>
@@ -115,7 +261,10 @@ function DashboardPage() {
               Actual vs predicted air quality index
             </p>
           </div>
-          <Select value={range} onValueChange={(v) => setRange(v as typeof range)}>
+          <Select
+            value={range}
+            onValueChange={(v) => setRange(v as typeof range)}
+          >
             <SelectTrigger className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -145,12 +294,18 @@ function DashboardPage() {
                   />
                   <XAxis
                     dataKey="time"
-                    tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+                    tick={{
+                      fill: "var(--color-muted-foreground)",
+                      fontSize: 12,
+                    }}
                     axisLine={{ stroke: "var(--color-border)" }}
                     tickLine={false}
                   />
                   <YAxis
-                    tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+                    tick={{
+                      fill: "var(--color-muted-foreground)",
+                      fontSize: 12,
+                    }}
                     axisLine={{ stroke: "var(--color-border)" }}
                     tickLine={false}
                     label={{
@@ -158,7 +313,10 @@ function DashboardPage() {
                       angle: -90,
                       position: "insideLeft",
                       offset: 18,
-                      style: { fill: "var(--color-muted-foreground)", fontSize: 12 },
+                      style: {
+                        fill: "var(--color-muted-foreground)",
+                        fontSize: 12,
+                      },
                     }}
                   />
                   <Tooltip
