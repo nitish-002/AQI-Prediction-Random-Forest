@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import {
   getTrends,
+  getStaticTestResults,
   getForecastHistory,
   getAqiCategory,
   type TrendPoint,
@@ -59,7 +60,8 @@ function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    getTrends(range).then((d) => {
+    // Fetch static test results from Jupyter Notebook export instead of live API
+    getStaticTestResults().then((d) => {
       setData(d);
       if (d.length > 0) {
         const latest = d[d.length - 1];
@@ -68,7 +70,7 @@ function DashboardPage() {
       }
       setLoading(false);
     });
-  }, [range]);
+  }, []);
 
   useEffect(() => {
     getForecastHistory(1).then((history) => {
@@ -256,24 +258,12 @@ function DashboardPage() {
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <div>
-            <CardTitle className="text-base">AQI Trend</CardTitle>
+            <CardTitle className="text-base">Model Performance (Static Test Set)</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Actual vs predicted air quality index
+              Actual vs Predicted AQI Values from Model Evaluation
             </p>
           </div>
-          <Select
-            value={range}
-            onValueChange={(v) => setRange(v as typeof range)}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">Last 24 hours</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
+          
         </CardHeader>
         <CardContent>
           <div className="h-[340px] w-full">
@@ -387,3 +377,4 @@ function MetricCard({
     </Card>
   );
 }
+

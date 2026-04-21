@@ -191,6 +191,26 @@ export async function predict(input: PredictInput): Promise<PredictionResult> {
 }
 
 // ---------- trends ----------
+export async function getStaticTestResults(): Promise<TrendPoint[]> {
+  try {
+    const res = await fetch(`/static_test_results.json`);
+    if (!res.ok) throw new Error("Failed to fetch static test results");
+    const data = await res.json();
+    
+    return data.trend.map((point: any) => {
+      const pt = new Date(point.time);
+      return {
+        time: pt.toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit" }),
+        actual: point.actual,
+        predicted: point.predicted,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching static test results:", error);
+    return [];
+  }
+}
+
 export async function getTrends(
   range: "24h" | "7d" | "30d" = "7d",
 ): Promise<TrendPoint[]> {
