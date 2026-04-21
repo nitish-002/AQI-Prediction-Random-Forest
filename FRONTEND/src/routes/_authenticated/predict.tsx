@@ -187,13 +187,13 @@ function PredictPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Predict AQI</h1>
         <p className="text-sm text-muted-foreground">
-          Run a single prediction or upload a CSV for batch inference.
+          Run a single prediction.
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6">
         {/* Manual input */}
-        <Card className="lg:col-span-2 shadow-sm">
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <div>
               <CardTitle className="text-base">Manual Input</CardTitle>
@@ -304,59 +304,7 @@ function PredictPage() {
           </CardContent>
         </Card>
 
-        {/* CSV upload */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Batch CSV</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Drop a CSV with the same columns to predict at scale.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={onDrop}
-              className={cn(
-                "flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors",
-                dragActive
-                  ? "border-primary bg-primary/5"
-                  : "border-border bg-muted/30 hover:bg-muted/50",
-              )}
-            >
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <UploadCloud className="h-6 w-6" />
-              </div>
-              <p className="text-sm font-medium">Drop CSV here</p>
-              <button
-                type="button"
-                onClick={() => fileInput.current?.click()}
-                className="mt-1 text-xs text-primary hover:underline"
-              >
-                or click to browse
-              </button>
-              <input
-                ref={fileInput}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={onPick}
-                className="hidden"
-              />
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                Max 5 MB · UTF-8 encoded
-              </p>
-            </div>
-            {uploadInfo && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-2.5 text-xs">
-                <FileSpreadsheet className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                <span>{uploadInfo}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* CSV upload - Hidden intentionally */}
       </div>
     </div>
   );

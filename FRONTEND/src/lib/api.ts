@@ -97,12 +97,12 @@ export function getAqiCategory(aqi: number): AqiCategory {
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  return window.sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function getStoredUser(): User | null {
   if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(USER_KEY);
+  const raw = window.sessionStorage.getItem(USER_KEY);
   return raw ? (JSON.parse(raw) as User) : null;
 }
 
@@ -112,35 +112,58 @@ export function isAuthenticated(): boolean {
 
 // ---------- auth ----------
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  await wait(700);
-  if (!email || !password) throw new Error("Email and password are required");
-  if (password.length < 4) throw new Error("Invalid credentials");
-
-  // TODO: real backend
-  // const res = await fetch(`${API_BASE_URL}/auth/login`, {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ email, password }),
-  // });
-  // if (!res.ok) throw new Error("Invalid credentials");
-  // return res.json();
-
+  const res = await fetch(`${API_BASE_URL}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Invalid credentials" }));
+    throw new Error(err.detail || "Sign in failed");
+  }
+  
+  const data = await res.json();
   const response: LoginResponse = {
-    token: `mock_${Date.now()}`,
+    token: data.token,
     user: {
-      id: "u_1",
-      name: email.split("@")[0] || "Researcher",
-      email,
+      id: data.email,
+      name: data.email.split("@")[0],
+      email: data.email,
     },
   };
-  window.localStorage.setItem(TOKEN_KEY, response.token);
-  window.localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+  
+  window.sessionStorage.setItem(TOKEN_KEY, response.token);
+  window.sessionStorage.setItem(USER_KEY, JSON.stringify(response.user));
   return response;
 }
 
+export async function addAdmin(email: string, password: string): Promise<{ message: string }> {
+  const token = getToken();
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  
+  const res = await fetch(`${API_BASE_URL}/add-admin`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email, password }),
+  });
+  
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to add admin" }));
+    throw new Error(err.detail || "Failed to add admin");
+  }
+  
+  return res.json();
+}
+
 export function logout(): void {
-  window.localStorage.removeItem(TOKEN_KEY);
-  window.localStorage.removeItem(USER_KEY);
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(USER_KEY);
 }
 
 // ---------- predictions ----------

@@ -13,7 +13,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { Upload, Wind, TrendingUp, Activity, Gauge, Clock } from "lucide-react";
+import { Upload, Wind, TrendingUp, Activity, Gauge, Clock, Home } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AqiBadge } from "@/components/AqiBadge";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import {
   getTrends,
+  getHistory,
   getStaticTestResults,
   getForecastHistory,
   getAqiCategory,
@@ -60,16 +61,20 @@ function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    // Fetch static test results from Jupyter Notebook export instead of live API
+    // Load historical static test data for the chart mapping
     getStaticTestResults().then((d) => {
       setData(d);
-      if (d.length > 0) {
-        const latest = d[d.length - 1];
-        setTodayAqi(latest.actual ?? 0);
-        setPredictedAqi(latest.predicted ?? 0);
-      }
       setLoading(false);
     });
+
+    // Separately load the live actual latest prediction to populate the Dashboard metrics header
+    getHistory().then((hist) => {
+      if (hist.items.length > 0) {
+        const latest = hist.items[0];
+        setTodayAqi(latest.aqi ?? 0);
+        setPredictedAqi(latest.aqi ?? 0);
+      }
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -102,8 +107,10 @@ function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="default" className="gap-1.5">
-            <Upload className="h-4 w-4" /> Upload CSV
+          <Button variant="secondary" asChild className="gap-1.5">
+            <Link to="/">
+              <Home className="h-4 w-4" /> Go back to client home page
+            </Link>
           </Button>
           <Button variant="outline" asChild className="gap-1.5">
             <Link to="/predict">
@@ -119,13 +126,13 @@ function DashboardPage() {
           icon={<Gauge className="h-4 w-4" />}
           label="Today's AQI"
           value={todayAqi}
-          sub="Live reading"
+          sub="Latest Current Prediction"
         />
         <MetricCard
           icon={<TrendingUp className="h-4 w-4" />}
           label="Predicted (24h)"
           value={predictedAqi}
-          sub="Model: RF v1.4.2"
+          sub="Next window estimation"
         />
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">

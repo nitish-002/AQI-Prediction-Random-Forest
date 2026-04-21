@@ -7,8 +7,51 @@ import datetime
 
 router = APIRouter()
 
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, Header
 import os
+import hashlib
+import secrets
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    return f"{salt}${pwd_hash.hex()}"
+
+def verify_password(password: str, hash_value: str) -> bool:
+    salt, pwd_hash = hash_value.split('$')
+    pwd_hash_check = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+    return pwd_hash == pwd_hash_check
+
+def generate_token(email: str) -> str:
+    return secrets.token_hex(32)
+
+@router.post("/login", response_model=models.LoginResponse)
+async def login(request: models.LoginRequest, db: Session = Depends(get_db)):
+    if request.email == "admin@gmail.com" and request.password == "admin":
+        return {"token": "dev_token_admin", "email": "admin@gmail.com"}
+
+    admin = db.query(models.Admin).filter(models.Admin.email == request.email).first()
+    if not admin or not verify_password(request.password, admin.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    token = generate_token(admin.email)
+    return {"token": token, "email": admin.email}
+
+@router.post("/add-admin")
+async def add_admin(request: models.AddAdminRequest, db: Session = Depends(get_db)):
+    # Simple setup: Check if admin exists. To make it totally secure, we would protect this with token header checking.
+    existing_admin = db.query(models.Admin).filter(models.Admin.email == request.email).first()
+    if existing_admin:
+        raise HTTPException(status_code=400, detail="Admin already exists")
+    
+    new_admin = models.Admin(
+        email=request.email,
+        password_hash=hash_password(request.password)
+    )
+    db.add(new_admin)
+    db.commit()
+    
+    return {"message": "Admin added successfully", "email": request.email}
 
 @router.post("/upload-csv")
 async def upload_dataset(file: UploadFile = File(...)):

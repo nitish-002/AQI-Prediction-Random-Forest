@@ -41,7 +41,25 @@ class ForecastRecord(Base):
     predicted_co = Column(Float)
     predicted_aqi = Column(Integer)
 
+class Admin(Base):
+    __tablename__ = "admins"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+
 # --- Pydantic Schemas (API Translation layer APIContracts.md) ---
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class LoginResponse(BaseModel):
+    token: str
+    email: str
+
+class AddAdminRequest(BaseModel):
+    email: str
+    password: str
+
 class PredictRequest(BaseModel):
     co: float
     nox: float
