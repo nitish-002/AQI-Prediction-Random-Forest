@@ -3,10 +3,11 @@
 //   - tanstackStart, viteReact, tailwindcss, tsConfigPaths,
 //     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
 //     error logger plugins, and sandbox detection (port/host/strictPort).
-// Cloudflare is disabled.
+// Cloudflare is disabled -- using Netlify adapter instead.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import netlify from "@netlify/vite-plugin-tanstack-start";
 
 export default defineConfig({
   cloudflare: false,
-  plugins: [],
+  plugins: [netlify()],
 });

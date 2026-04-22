@@ -1,0 +1,7 @@
+[build]
+  base = "FRONTEND"
+  command = "npm run build"
+  publish = "dist/client"
+
+[functions]
+  directory = ".netlify/v1/functions"
