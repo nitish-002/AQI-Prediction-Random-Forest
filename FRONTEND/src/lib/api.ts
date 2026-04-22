@@ -1,14 +1,17 @@
 /**
  * Centralized API client for the AQI Prediction System.
  *
- * All functions currently return mock data so the UI works without a backend.
- * To wire up your real backend:
- *   1. Set VITE_API_BASE_URL in your env (or change API_BASE_URL below)
- *   2. Replace each mock body with the commented `fetch(...)` call
+ * Development defaults to localhost backend and can be overridden with
+ * VITE_API_BASE_URL. Production always uses the same-origin /api proxy.
  */
 
-export const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://127.0.0.1:8000";
+const devApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)
+  ?.trim()
+  .replace(/\/+$/, "");
+
+export const API_BASE_URL = import.meta.env.PROD
+  ? "/api"
+  : (devApiBaseUrl && devApiBaseUrl.length > 0 ? devApiBaseUrl : "http://127.0.0.1:8000");
 
 const TOKEN_KEY = "aqi_auth_token";
 const USER_KEY = "aqi_auth_user";
