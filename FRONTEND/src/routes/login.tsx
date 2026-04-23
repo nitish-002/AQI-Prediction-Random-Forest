@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Wind, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -121,10 +121,7 @@ function LoginPage() {
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            Demo mode — any email + password (4+ chars) works.{" "}
-            <Link to="/dashboard" className="text-primary hover:underline">
-              Skip
-            </Link>
+            Demo mode — use your admin credentials to continue.
           </p>
         </div>
       </div>

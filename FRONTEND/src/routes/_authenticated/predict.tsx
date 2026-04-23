@@ -96,10 +96,6 @@ function PredictPage() {
         next[f.key] = "Must be a number";
         continue;
       }
-      if (num < f.min || num > f.max) {
-        next[f.key] = `Must be between ${f.min} and ${f.max}`;
-        continue;
-      }
       parsed[f.key] = num;
     }
     setErrors(next);
@@ -225,8 +221,6 @@ function PredictPage() {
                         type="number"
                         inputMode="decimal"
                         step={f.step}
-                        min={f.min}
-                        max={f.max}
                         placeholder="0"
                         value={values[f.key]}
                         onChange={(e) => setField(f.key, e.target.value)}

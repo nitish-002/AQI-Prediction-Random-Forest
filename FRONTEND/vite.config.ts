@@ -7,7 +7,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import netlify from "@netlify/vite-plugin-tanstack-start";
 
+const isNetlify = process.env.NETLIFY === "true";
+
 export default defineConfig({
   cloudflare: false,
-  plugins: [netlify()],
+  // Keep Netlify adapter active in Netlify environment, but skip it locally
+  // so local dev does not resolve root netlify.toml with a duplicated base path.
+  plugins: isNetlify ? [netlify()] : [],
 });
