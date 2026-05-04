@@ -103,7 +103,7 @@ function HomePage() {
               <CardContent className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Model</span>
-                  <span className="font-semibold">RandomForest v1.0</span>
+                  <span className="font-semibold">XGBoost</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Last Prediction</span>
